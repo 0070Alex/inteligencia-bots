@@ -1,0 +1,145 @@
+import face_recognition
+import cv2
+import os
+import numpy as np
+from tkinter import *
+from mtcnn.mtcnn import MTCNN
+from matplotlib import pyplot as pltcls
+
+from datetime import datetime
+
+import musicbrainzngs as mb
+from PIL import Image
+
+import db_conection as db
+
+txt_login = "Iniciar Sesión"
+txt_register = "Registrarse"
+
+color_white = "#f4f5f4"
+color_black = "#107B95"
+
+color_black_btn = "#202020"
+color_background = "#393D3E"
+
+font_label = "Century Gothic"
+size_screen = "500x300"
+
+# colors
+color_success = "\033[1;32;40m"
+color_error = "\033[1;31;40m"
+color_normal = "\033[0;37;40m"
+
+imagesPath = "C:/Users/Alexander Elias/Desktop/proyecto-ia/bots/faces"
+
+# GENERAL
+def getEnter(screen):
+    ''' Set an enter inside the screen '''
+    Label(screen, text="", bg=color_background).pack()
+
+
+def capturarVideo():
+
+    facesEncodings = []
+    facesName = []
+
+    imagesPath = "C:/Users/Alexander Elias/Desktop/proyecto-ia/bots/faces"
+
+    for file_name in os.listdir(imagesPath):
+        image = cv2.imread(imagesPath + "/" + file_name)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        f_coding = face_recognition.face_encodings(image, known_face_locations=[(0, 150, 150,0)])[0]
+        facesEncodings.append(f_coding)
+        facesName.append(file_name.split(".")[0])
+        ##cv2.imshow("Image", image)
+        #cv2.waitKey(0)
+    ##cv2.destroyAllWindows()
+
+    #print(facesEncodings)
+    #print(facesName)
+
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+    feceClassif = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+
+    while True:
+        ret, frame = cap.read()
+        if ret == False:
+            break
+        frame = cv2.flip(frame, 1)
+        orig = frame.copy()
+        faces = feceClassif.detectMultiScale(frame, 1.1, 5)
+
+        for (x, y, w, h) in faces:
+            face = orig[y:y + h, x:x +w]
+            face = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+            actual_face_encoding = face_recognition.face_encodings(face, known_face_locations=[(0, w, h, 0)])[0]
+            result = face_recognition.compare_faces(facesEncodings, actual_face_encoding)
+            print(result)
+
+            #extramos información actual 
+            info = datetime.now ()
+            #Extraemos fecha
+            fecha = info.strftime('%Y-%m-%d')
+            #extraemos hora
+            hora = info.strftime ('%H:%M:%S')
+
+        
+
+            
+
+            if True in result:
+                index = result.index(True)
+                name = facesName[index]
+                color = (125, 220, 0)
+
+                id = db.getUserByUsername(name)
+                print(id)
+                db.insertAsistenccia(id)
+            else:
+                name = "Desconocido"
+                color = (50, 50, 255)
+            cv2.rectangle(frame, (x, y + h), (x + w, y + h + 30), color, -1) 
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255,0), 2)
+            cv2.putText(frame, name, (x, y + h +25), 2, 1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.imshow("Frame", frame)
+        k = cv2.waitKey(1) & 0xFF
+        if k == 27:
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+
+#REGISTRO
+
+def verDatos():
+    datos = db.getNickName();
+    print(datos)
+
+    for user in datos:
+        print(user)
+        datos = db.getAllUser(user,imagesPath + "/" + user + ".jpg")    
+ 
+    
+
+   
+
+#os.remove(result_file)
+
+
+
+
+
+root = Tk()
+root.geometry(size_screen)
+root.title("BOTS")
+root.configure(bg=color_background)
+Label(text="¡TOMA DE ASISTENCIA!", fg=color_white, bg=color_black, font=(font_label, 18), width="500", height="2").pack()
+
+getEnter(root)
+Button(text="Actualizar Datos", fg=color_white, bg=color_black_btn, activebackground=color_background, borderwidth=0, font=(font_label, 14), height="2", width="20", command=verDatos).pack()
+
+getEnter(root)
+Button(text="Tomar Asistencia", fg=color_white, bg=color_black_btn, activebackground=color_background, borderwidth=0, font=(font_label, 14), height="2", width="20", command=capturarVideo).pack()
+
+root.mainloop()
